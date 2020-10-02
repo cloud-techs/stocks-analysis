@@ -5,49 +5,36 @@ import logging
 import threading
 import time
 
-INDEX = "52-week-high-low"
+INDEX = "high-low-90"
+
+data = utils.utils_data_refresh()
 
 
-def update_data(i):
-    year, month, day = utils.get_date_format(delta=1)
-    doc  = {}
-    comments = []
-    index = "52-week-high-low"
-    scrip = i["symbol"]
-    #print(i)
-    doc["stock"] = i["symbol"]
-    doc["high"] = i["high"]
-    doc["high_date"] = i["high_date"]
-    doc["low"] = i["low"]
-    doc["low_date"] = i["low_date"]
-    curr_date = datetime.now()
-    #print(type(curr_date))
-    data = es_get_doc_source(INDEX, i["symbol"])
-    #print("####", type(datetime.strptime(data["high_date"].split("T")[0], "%Y-%m-%d")))
-   # print(data["high_date"].split("T")[0])
-    prev_date = datetime.strptime(data["high_date"].split("T")[0], "%Y-%m-%d")
-    prev_l = datetime.strptime(data["low_date"].split("T")[0], "%Y-%m-%d")
-    diff_h =  (curr_date - datetime.strptime(data["high_date"].split("T")[0], "%Y-%m-%d")).days
-    print(i["symbol"],diff_h)
-
-    diff_l = (curr_date - datetime.strptime(data["low_date"].split("T")[0], "%Y-%m-%d")).days
-    print(i["symbol"],diff_l)
-    #print(scrip, i["high_date"], i["low_date"])
-
-    ch = i["high_date"]
-    cl = i["low_date"]
+def update_data_source():
+    data = utils.utils_data_refresh()
+    for count, i in enumerate(data):
+        while (threading.active_count() > 25):
+            time.sleep(3)
+        try:
+            worker = threading.Thread(target=update_record, args=(i,))
+            worker.start()
+            print(threading.active_count())
+            # worker.my_queue.get()
+        except Exception as e:
+            print(e)
 
 
-    if diff_h > 60:
-        doc["updated-on"] = f"{year}-{month}-{day}"
-        doc["comments"] = f"{scrip} made previous high on {prev_date} , updating latest high on {ch}"
-        #print(f"{scrip} made previous high on {prev_l} , updating latest high on  {ch}")
-    if diff_l > 60:
-        doc["updated-on"] = f"{year}-{month}-{day}"
-        doc["comments"] = f"{scrip} made previous low on {prev_date} , updating latest low on {cl}"
-        #print(f"{scrip} made previous low on {prev_date} , updating latest low on {cl}")
+def update_record(datapoint):
+    print(datapoint)
+    doc = {}
+    doc["symbol"] = datapoint[0]
+    doc["high"] = datapoint[1]
+    doc["low"] = datapoint[2]
+    doc["high_index"] = datapoint[3]
+    doc["low_index"] = datapoint[4]
+    es_update_document(INDEX, doc, datapoint[0])
 
 
-
-
-
+if __name__ == "__main__":
+    utils.utils_csv_refresh(delta=1)
+    update_data_source()
