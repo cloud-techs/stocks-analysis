@@ -1,0 +1,5 @@
+/.idea/
+/csvs/
+/zips/
+*.csv
+/__pycache__/
